@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orders Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0c10; --surface: #111318; --border: #1e2230; --muted: #3a3f52;
+      --text: #e4e8f0; --sub: #7880a0; --accent: #4f8cff; --green: #29d09a;
+      --orange: #f8a94c; --red: #f05a6e; --mono: 'IBM Plex Mono', monospace;
+      --sans: 'Manrope', sans-serif; --r: 12px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; padding: 0 0 60px; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 24px 32px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,12,16,.92); backdrop-filter: blur(12px); z-index: 10; }
+    .logo { display: flex; align-items: center; gap: 10px; font-size: 1.15rem; font-weight: 800; }
+    .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .last-sync { font-family: var(--mono); font-size: .75rem; color: var(--sub); }
+    .sync-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px 18px; font-family: var(--sans); font-size: .8rem; font-weight: 700; cursor: pointer; }
+    .sync-btn:disabled { opacity: .5; cursor: not-allowed; }
+    main { max-width: 1280px; margin: 0 auto; padding: 32px 32px 0; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 22px 24px; position: relative; overflow: hidden; }
+    .kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--kpi-color, var(--accent)); }
+    .kpi-label { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--sub); margin-bottom: 10px; }
+    .kpi-value { font-family: var(--mono); font-size: 1.8rem; font-weight: 600; line-height: 1; }
+    .kpi-sub { font-size: .72rem; color: var(--sub); margin-top: 6px; }
+    .kpi-icon { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 2rem; opacity: .08; }
+    .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 28px; }
+    @media (max-width: 800px) { .charts-row { grid-template-columns: 1fr; } }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 24px; }
+    .card-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; }
+    .card-title { font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--sub); }
+    .card-tag { font-family: var(--mono); font-size: .7rem; color: var(--muted); background: var(--border); padding: 3px 8px; border-radius: 4px; }
+    .chart-wrap { position: relative; height: 220px; }
+    .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+    .table-head { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+    .table-title { font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--sub); }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { text-align: left; font-size: .68rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 12px 24px; border-bottom: 1px solid var(--border); }
+    tbody tr { border-bottom: 1px solid var(--border); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,.02); }
+    td { padding: 13px 24px; font-size: .82rem; white-space: nowrap; }
+    .td-mono { font-family: var(--mono); font-size: .77rem; color: var(--sub); }
+    .td-amount { font-family: var(--mono); font-weight: 600; }
+    .td-amount.high { color: var(--green); }
+    .badge { display: inline-flex; align-items: center; gap: 5px; font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 20px; }
+    .badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .badge-new { background: rgba(79,140,255,.12); color: var(--accent); }
+    .badge-processing { background: rgba(248,169,76,.12); color: var(--orange); }
+    .badge-complete { background: rgba(41,208,154,.12); color: var(--green); }
+    .badge-cancel-other { background: rgba(240,90,110,.12); color: var(--red); }
+    .state-msg { text-align: center; padding: 48px 24px; color: var(--sub); font-size: .85rem; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-dot"></div> Orders Dashboard</div>
+  <div class="header-right">
+    <span class="last-sync" id="last-sync">—</span>
+    <button class="sync-btn" id="sync-btn" onclick="loadData()">↻ Обновить</button>
+  </div>
+</header>
+<main>
+  <div class="kpi-grid">
+    <div class="kpi" style="--kpi-color:var(--accent)"><div class="kpi-label">Всего заказов</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub">в базе данных</div><div class="kpi-icon">📦</div></div>
+    <div class="kpi" style="--kpi-color:var(--green)"><div class="kpi-label">Выручка</div><div class="kpi-value" id="kpi-revenue">—</div><div class="kpi-sub">сумма всех заказов</div><div class="kpi-icon">💰</div></div>
+    <div class="kpi" style="--kpi-color:var(--orange)"><div class="kpi-label">Активные</div><div class="kpi-value" id="kpi-processing">—</div><div class="kpi-sub">new + processing</div><div class="kpi-icon">⚙️</div></div>
+    <div class="kpi" style="--kpi-color:var(--red)"><div class="kpi-label">Средний чек</div><div class="kpi-value" id="kpi-avg">—</div><div class="kpi-sub">₸ на заказ</div><div class="kpi-icon">📊</div></div>
+  </div>
+  <div class="charts-row">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Заказы по дням</span><span class="card-tag" id="chart-range">—</span></div>
+      <div class="chart-wrap"><canvas id="ordersChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Статусы</span></div>
+      <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+    </div>
+  </div>
+  <div class="table-card">
+    <div class="table-head"><span class="table-title">Последние заказы</span></div>
+    <div id="table-container"><div class="state-msg"><span class="spinner"></span> Загрузка...</div></div>
+  </div>
+</main>
+<script>
+const CONFIG = {
+  SUPABASE_URL: "https://vuqmyekwnrchbwhpeere.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1cW15ZWt3bnJjaGJ3aHBlZXJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MjM0MDEsImV4cCI6MjA5MTI5OTQwMX0.DhUcBO8WWhSlpO_PhbAZ4JHqU7R3QNk8BDENOeg6-y0",
+  HIGH_THRESHOLD: 50000,
+};
+
+let ordersChart = null, statusChart = null;
+
+async function supabaseQuery(table, params) {
+  const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/${table}?${params}`, {
+    headers: { "apikey": CONFIG.SUPABASE_ANON_KEY, "Authorization": `Bearer ${CONFIG.SUPABASE_ANON_KEY}` }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function fmt(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1)+"M";
+  if (n >= 1000) return (n/1000).toFixed(0)+"K";
+  return n.toLocaleString("ru");
+}
+
+function updateKPI(orders) {
+  const total = orders.length;
+  const revenue = orders.reduce((s,o) => s + Number(o.total||0), 0);
+  const active = orders.filter(o => o.status==="new" || o.status==="processing").length;
+  const avg = total ? Math.round(revenue/total) : 0;
+  document.getElementById("kpi-total").textContent = total;
+  document.getElementById("kpi-revenue").textContent = fmt(revenue);
+  document.getElementById("kpi-processing").textContent = active;
+  document.getElementById("kpi-avg").textContent = fmt(avg);
+}
+
+function updateLineChart(orders) {
+  const byDay = {};
+  orders.forEach(o => { const d=(o.created_at||"").slice(0,10); if(d) byDay[d]=(byDay[d]||0)+1; });
+  const labels = Object.keys(byDay).sort();
+  const values = labels.map(d => byDay[d]);
+  if (labels.length) document.getElementById("chart-range").textContent = `${labels[0]} → ${labels[labels.length-1]}`;
+  const ctx = document.getElementById("ordersChart").getContext("2d");
+  const g = ctx.createLinearGradient(0,0,0,220);
+  g.addColorStop(0,"rgba(79,140,255,.35)"); g.addColorStop(1,"rgba(79,140,255,0)");
+  if (ordersChart) ordersChart.destroy();
+  ordersChart = new Chart(ctx, { type:"line", data:{ labels, datasets:[{ data:values, borderColor:"#4f8cff", backgroundColor:g, borderWidth:2, pointRadius:3, fill:true, tension:.35 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{grid:{color:"#1e2230"}, ticks:{color:"#7880a0"}}, y:{grid:{color:"#1e2230"}, ticks:{color:"#7880a0", precision:0}, beginAtZero:true} } } });
+}
+
+function updateStatusChart(orders) {
+  const c = {new:0, processing:0, complete:0, "cancel-other":0};
+  orders.forEach(o => { if(c[o.status]!==undefined) c[o.status]++; });
+  const ctx = document.getElementById("statusChart").getContext("2d");
+  if (statusChart) statusChart.destroy();
+  statusChart = new Chart(ctx, { type:"doughnut", data:{ labels:["Новый","В работе","Выполнен","Отменён"], datasets:[{ data:[c.new,c.processing,c.complete,c["cancel-other"]], backgroundColor:["#4f8cff","#f8a94c","#29d09a","#f05a6e"], borderColor:"#111318", borderWidth:3 }] }, options:{ responsive:true, maintainAspectRatio:false, cutout:"68%", plugins:{ legend:{ position:"bottom", labels:{color:"#7880a0", padding:14, boxWidth:10} } } } });
+}
+
+function updateTable(orders) {
+  const recent = [...orders].sort((a,b) => new Date(b.created_at)-new Date(a.created_at)).slice(0,20);
+  const SL = {new:"Новый", processing:"В работе", complete:"Выполнен", "cancel-other":"Отменён"};
+  const rows = recent.map(o => {
+    const total = Number(o.total||0);
+    const high = total >= CONFIG.HIGH_THRESHOLD;
+    const dt = new Date(o.created_at).toLocaleString("ru-KZ",{dateStyle:"short",timeStyle:"short"});
+    return `<tr>
+      <td class="td-mono">${o.number||"—"}</td>
+      <td>${o.customer_name||"—"}</td>
+      <td><span class="badge badge-${o.status}">${SL[o.status]||o.status}</span></td>
+      <td class="td-amount ${high?"high":""}">${fmt(total)} ₸${high?" 🔔":""}</td>
+      <td class="td-mono">${dt}</td>
+    </tr>`;
+  }).join("");
+  document.getElementById("table-container").innerHTML = `<table><thead><tr><th>Номер</th><th>Клиент</th><th>Статус</th><th>Сумма</th><th>Дата</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function loadData() {
+  const btn = document.getElementById("sync-btn");
+  btn.disabled = true; btn.textContent = "↻ Загрузка…";
+  try {
+    const orders = await supabaseQuery("orders","select=*&order=created_at.desc&limit=500");
+    updateKPI(orders);
+    updateLineChart(orders);
+    updateStatusChart(orders);
+    updateTable(orders);
+    document.getElementById("last-sync").textContent = "Обновлено в " + new Date().toLocaleTimeString("ru-KZ");
+  } catch(err) {
+    document.getElementById("table-container").innerHTML = `<div class="state-msg">❌ Ошибка: ${err.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "↻ Обновить";
+  }
+}
+
+loadData();
+setInterval(loadData, 60000);
+</script>
+</body>
+</html>
